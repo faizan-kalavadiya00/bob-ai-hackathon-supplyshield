@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+sqlalchemy
+alembic
+python-dotenv
+httpx
+# psycopg3 (sync + async, binary wheels — works on Python 3.14)
+# Provides both postgresql+psycopg:// (sync, for Alembic/seed)
+# and postgresql+psycopg_async:// (async, for FastAPI)
+psycopg[binary]

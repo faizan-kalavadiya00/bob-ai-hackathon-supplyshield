@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: supplyshield-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: supplyshield
+      POSTGRES_USER: supplyshield
+      POSTGRES_PASSWORD: supplyshield
+    ports:
+      - "5432:5432"
+    volumes:
+      - supplyshield_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U supplyshield -d supplyshield"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  supplyshield_pgdata:
