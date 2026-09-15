@@ -4,43 +4,32 @@
  */
 
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { resilienceApi, type ResilienceResponse, type ResilienceTransaction } from '../api/resilience'
+import { shipmentsApi, type ShipmentSummary } from '../api/shipments'
 import { RRIGauge } from '../components/RRIGauge'
 import { WalletDimensionCard } from '../components/WalletDimensionCard'
 
-// Known shipments for the selector — in production this comes from /api/shipments
-const SHIPMENT_OPTIONS = [
-  { id: 'S-1042', label: 'S-1042 — Pharma Ahmedabad→Dubai (CRITICAL)' },
-]
-
 export function ResilienceWallet() {
-  const [shipmentCode, setShipmentCode] = useState('S-1042')
-  const [shipmentId, setShipmentId] = useState<number | null>(null)
+  const [searchParams] = useSearchParams()
+  const requestedShipment = Number(searchParams.get('shipment')) || null
+  const [shipments, setShipments] = useState<ShipmentSummary[]>([])
+  const [shipmentId, setShipmentId] = useState<number | null>(requestedShipment)
   const [data, setData] = useState<ResilienceResponse | null>(null)
   const [transactions, setTransactions] = useState<ResilienceTransaction[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Resolve shipment code → numeric ID via a quick health check + search
   useEffect(() => {
-    // For Phase 3 demo, we query the summary to trigger wallet initialisation
-    // then fetch by known ID. S-1042 is always ID=1 from the seed (first inserted).
-    // In Phase 4 we'll add a proper /api/shipments endpoint.
-    resilienceApi.getSummary().catch(() => null)
-    // Try IDs 1–10 to find S-1042
-    const findId = async () => {
-      for (let id = 1; id <= 20; id++) {
-        try {
-          const r = await resilienceApi.getResilience(id)
-          if (r.wallet.shipment_code === shipmentCode) {
-            setShipmentId(id)
-            return
-          }
-        } catch { /* not this one */ }
-      }
-    }
-    findId()
-  }, [shipmentCode])
+    shipmentsApi.list()
+      .then((records) => {
+        setShipments(records)
+        if (!requestedShipment) {
+          setShipmentId(records.find((shipment) => shipment.shipment_code === 'S-1042')?.id ?? records[0]?.id ?? null)
+        }
+      })
+      .catch((e) => setError(String(e)))
+  }, [requestedShipment])
 
   useEffect(() => {
     if (shipmentId === null) return
@@ -69,6 +58,12 @@ export function ResilienceWallet() {
 
   const rri = data?.rri
   const wallet = data?.wallet
+  const selectableShipments = shipments
+    .filter((shipment) => shipment.id === shipmentId || shipment.shipment_code === 'S-1042' || ['at_risk', 'delayed', 'in_transit'].includes(shipment.status))
+    .sort((a, b) => (a.shipment_code === 'S-1042' ? -1 : b.shipment_code === 'S-1042' ? 1 : a.shipment_code.localeCompare(b.shipment_code)))
+  const mostDepleted = wallet
+    ? (['time', 'cost', 'temperature', 'capacity'] as const).map((dimension) => wallet[dimension]).sort((a, b) => a.dimension_score - b.dimension_score)[0]
+    : null
 
   return (
     <div className="p-6 space-y-6 max-w-5xl">
@@ -94,13 +89,15 @@ export function ResilienceWallet() {
       <div className="flex items-center gap-3">
         <label className="text-xs text-gray-500 shrink-0">Shipment:</label>
         <select
-          value={shipmentCode}
-          onChange={(e) => setShipmentCode(e.target.value)}
+          value={shipmentId ?? ''}
+          onChange={(e) => setShipmentId(Number(e.target.value))}
           className="text-sm bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5
                      text-gray-200 focus:outline-none focus:border-shield-500"
         >
-          {SHIPMENT_OPTIONS.map((o) => (
-            <option key={o.id} value={o.id}>{o.label}</option>
+          {selectableShipments.map((shipment) => (
+            <option key={shipment.id} value={shipment.id}>
+              {shipment.shipment_code} — {shipment.cargo_type} {shipment.origin}→{shipment.destination} ({shipment.priority.toUpperCase()})
+            </option>
           ))}
         </select>
         {shipmentId !== null && (
@@ -182,6 +179,13 @@ export function ResilienceWallet() {
                   ))}
                 </div>
               </div>
+              {mostDepleted && (
+                <div className="rounded-lg border border-gray-800 bg-gray-950/50 px-3 py-2 text-xs">
+                  <span className="text-gray-500">Primary resilience pressure: </span>
+                  <span className="font-semibold text-amber-300 uppercase">{mostDepleted.dimension}</span>
+                  <span className="text-gray-400"> retains {mostDepleted.dimension_score.toFixed(0)}% of its available budget.</span>
+                </div>
+              )}
             </div>
           </div>
 

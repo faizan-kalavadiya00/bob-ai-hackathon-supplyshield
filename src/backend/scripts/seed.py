@@ -47,6 +47,8 @@ from app.models.disruption import DisruptionStatus, DisruptionType
 from app.models.fleet import VehicleStatus
 from app.models.resilience import WalletDimension
 from app.models.shipment import CargoPriority, ShipmentStatus
+from app.services.disruption_impact import apply_disruption_to_shipment
+from app.services.wallet_service import initialise_shipment_wallets
 
 # ─────────────────────────────────────────────────────────────────────────────
 SEED = 42
@@ -828,6 +830,30 @@ def seed_resilience_wallets(
     print(f"  Resilience wallets: {count} (+ {count} initial transactions)")
 
 
+def seed_demo_resilience_impact(
+    session: Session,
+    shipment_ids: dict[str, int],
+    disruption_ids: dict[str, int],
+) -> None:
+    """Apply the recorded Mumbai event to the S-1042 wallet once.
+
+    This reuses the production disruption-impact service so the seeded demo
+    transaction ledger, wallet balances, and RRI tell the same deterministic
+    story as the API. Other linked shipments remain available as raw impact
+    records and are not mass-applied to avoid obscuring the demo scenario.
+    """
+    shipment = session.get(Shipment, shipment_ids["S-1042"])
+    link = session.get(
+        ShipmentDisruption,
+        (shipment_ids["S-1042"], disruption_ids["DIS-001"]),
+    )
+    if shipment is None or link is None:
+        raise RuntimeError("S-1042 / DIS-001 demo relationship is missing")
+    initialise_shipment_wallets(session, shipment)
+    apply_disruption_to_shipment(session, shipment, link, "DIS-001")
+    print("  Demo resilience impact: DIS-001 applied to S-1042 wallet")
+
+
 def seed_audit_log(
     session: Session,
     shipment_ids: dict[str, int],
@@ -864,7 +890,10 @@ def reset_all(engine) -> None:
     ]
     with engine.begin() as conn:
         for table in tables_in_order:
-            conn.execute(text(f"TRUNCATE TABLE {table} RESTART IDENTITY CASCADE"))
+            # RESTART IDENTITY requires ownership of every attached sequence,
+            # which is not available to many least-privilege application roles.
+            # Seed records are addressed by stable business codes, not sequence IDs.
+            conn.execute(text(f"TRUNCATE TABLE {table} CASCADE"))
     print("  Reset: all seed tables truncated.")
 
 
@@ -903,6 +932,7 @@ def main() -> None:
         seed_shipment_disruptions(session, shipment_ids, disruption_ids)
         seed_cold_chain_readings(session, shipment_ids, temp_sensitive_ids)
         seed_resilience_wallets(session, supplier_ids, route_ids)
+        seed_demo_resilience_impact(session, shipment_ids, disruption_ids)
         seed_audit_log(session, shipment_ids)
         session.commit()
 

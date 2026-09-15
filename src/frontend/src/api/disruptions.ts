@@ -105,6 +105,28 @@ export interface DisruptionImpact {
   cascade: CascadeNode
 }
 
+/** AI Decision Support — mirrors AIInsightsResponseSchema from the backend. */
+export interface AIInsightsRecord {
+  disruption_explanation: string
+  risk_summary: string
+  decision_support: string
+  recommended_actions: string[]
+  model_id: string
+  tokens_used: number | null
+}
+
+export interface AIInsightsResponse {
+  watsonx_enabled: boolean
+  /** "available" | "unavailable" | "error" */
+  status: string
+  message: string
+  /** Deterministic system facts — always present regardless of AI status */
+  system_facts: Record<string, unknown>
+  /** AI-generated text — null when watsonx is not configured or fails */
+  insights: AIInsightsRecord | null
+  error_detail: string | null
+}
+
 export interface DisruptionDetail {
   id: number
   disruption_code: string
@@ -154,4 +176,12 @@ export const disruptionsApi = {
 
   getImpact: (id: number) =>
     request<DisruptionImpact>(`/api/disruptions/${id}/impact`),
+
+  /**
+   * AI Decision Support panel data.
+   * Always returns system_facts (deterministic).
+   * insights is null when watsonx.ai is not configured.
+   */
+  getAIInsights: (id: number) =>
+    request<AIInsightsResponse>(`/api/disruptions/${id}/ai-insights`),
 }

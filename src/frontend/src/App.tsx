@@ -4,7 +4,13 @@ import { Topbar } from './components/Topbar'
 import { Dashboard } from './pages/Dashboard'
 import { ResilienceWallet } from './pages/ResilienceWallet'
 import { Disruptions } from './pages/Disruptions'
-import { PlaceholderPage } from './pages/PlaceholderPage'
+import { Shipments } from './pages/Shipments'
+import { Fleet } from './pages/Fleet'
+import { ColdChain } from './pages/ColdChain'
+import { Simulation } from './pages/Simulation'
+import { Recovery } from './pages/Recovery'
+import { Approvals } from './pages/Approvals'
+import { Audit } from './pages/Audit'
 
 const PAGE_TITLES: Record<string, string> = {
   '/':            'Dashboard',
@@ -47,12 +53,7 @@ export default function App() {
           path="/shipments"
           element={
             <Layout title={PAGE_TITLES['/shipments']}>
-              <PlaceholderPage
-                title="Shipment Tracking"
-                description="Real-time shipment tracking with disruption flags, ETA, and cold-chain status."
-                icon="🚢"
-                phase={2}
-              />
+              <Shipments />
             </Layout>
           }
         />
@@ -76,12 +77,7 @@ export default function App() {
           path="/fleet"
           element={
             <Layout title={PAGE_TITLES['/fleet']}>
-              <PlaceholderPage
-                title="Fleet & Route Optimization"
-                description="Vehicle grid, risk-weighted route alternatives, and fleet allocation recommendations."
-                icon="🚛"
-                phase={3}
-              />
+              <Fleet />
             </Layout>
           }
         />
@@ -89,12 +85,7 @@ export default function App() {
           path="/cold-chain"
           element={
             <Layout title={PAGE_TITLES['/cold-chain']}>
-              <PlaceholderPage
-                title="Cold Chain Monitoring"
-                description="IoT sensor readings, temperature breach detection, and cargo-at-risk summary."
-                icon="❄"
-                phase={3}
-              />
+              <ColdChain />
             </Layout>
           }
         />
@@ -102,12 +93,7 @@ export default function App() {
           path="/simulation"
           element={
             <Layout title={PAGE_TITLES['/simulation']}>
-              <PlaceholderPage
-                title="Disruption Simulation"
-                description="Scenario-based disruption simulation with RRI impact projection and before/after comparison."
-                icon="🔬"
-                phase={3}
-              />
+              <Simulation />
             </Layout>
           }
         />
@@ -115,12 +101,7 @@ export default function App() {
           path="/recovery"
           element={
             <Layout title={PAGE_TITLES['/recovery']}>
-              <PlaceholderPage
-                title="Recovery Planning"
-                description="AI-assisted recovery plan steps, RRI recovery projection, and IBM Bob narrative panel."
-                icon="♻"
-                phase={3}
-              />
+              <Recovery />
             </Layout>
           }
         />
@@ -128,12 +109,7 @@ export default function App() {
           path="/approvals"
           element={
             <Layout title={PAGE_TITLES['/approvals']}>
-              <PlaceholderPage
-                title="Human Approvals"
-                description="Pending high-impact action approvals, approval history, and human-in-the-loop workflow."
-                icon="✅"
-                phase={2}
-              />
+              <Approvals />
             </Layout>
           }
         />
@@ -141,12 +117,7 @@ export default function App() {
           path="/audit"
           element={
             <Layout title={PAGE_TITLES['/audit']}>
-              <PlaceholderPage
-                title="Audit Log"
-                description="Immutable, paginated audit trail of all state changes with actor, source, and before/after diff."
-                icon="📋"
-                phase={2}
-              />
+              <Audit />
             </Layout>
           }
         />

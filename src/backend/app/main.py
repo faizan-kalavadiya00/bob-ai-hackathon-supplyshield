@@ -9,7 +9,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import health, resilience, disruptions
+from app.routers import (
+    health, resilience, disruptions, shipments,
+    fleet, cold_chain, simulation, recovery, approvals, audit
+)
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +53,13 @@ def create_app() -> FastAPI:
     app.include_router(health.router, tags=["System"])
     app.include_router(resilience.router)
     app.include_router(disruptions.router)
+    app.include_router(shipments.router)
+    app.include_router(fleet.router)
+    app.include_router(cold_chain.router)
+    app.include_router(simulation.router)
+    app.include_router(recovery.router)
+    app.include_router(approvals.router)
+    app.include_router(audit.router)
 
     return app
 

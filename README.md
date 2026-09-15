@@ -1,121 +1,93 @@
-# 🚀 [Your Project Title Here]
+# SupplyShield
 
-> ⚠️ **Replace everything in `[ ]` brackets with your actual content before submission.**
+SupplyShield is a supply-chain resilience intelligence platform for turning a disruption into a clear operational decision. It connects a disruption's explainable fingerprint to historical similarity, affected shipments, financial exposure, resilience budgets, and a cascade view of risk.
 
----
+## Problem and solution
 
-## 👥 Team
+Operations teams often have data about an incident but lack a fast, defensible answer to what it affects and which action deserves attention first. SupplyShield presents the path from disruption to route, shipment, cargo exposure, resilience consumption, and a recommended investigation—without presenting deterministic operational metrics as AI predictions.
 
-| Field | Value |
-|---|---|
-| **Team Name** | [Your Team Name] |
-| **Track** | [AI / DevOps / Sustainability / Open] |
-| **Team Lead** | [Name] — [email@ibm.com] |
-| **Members** | [Name 1], [Name 2], [Name 3] |
+## What it includes
 
----
+- Executive dashboard with live aggregate RRI, active disruption counts, shipment exposure, and the Mumbai Port Crisis demo scenario.
+- Disruption intelligence: summary, explainable Disruption DNA, historical similarity, affected shipments, and cascade impact.
+- A deterministic Resilience Wallet for TIME, COST, TEMPERATURE, and CAPACITY, plus an explainable Resilience Remaining Index (RRI).
+- Shipment investigation view and a decision-support handoff to the shipment wallet.
+- PostgreSQL migrations, seed scripts, unit tests, Docker Compose, and environment-based configuration.
 
-## 🎯 Problem Statement
+## Architecture
 
-> In 2–3 sentences: What problem does your project solve? Who experiences this problem?
+React + TypeScript/Vite provides the operations UI. FastAPI exposes typed REST endpoints and calls deterministic Python services for Disruption DNA, similarity, cascade relationships, wallet calculations, and RRI. PostgreSQL is the system of record. Optional watsonx.ai configuration is isolated in environment variables; no AI response is fabricated when credentials are absent.
 
-[Describe the real-world problem your project addresses. Be specific about who the user is and what pain point they face.]
-
----
-
-## 💡 Solution
-
-> In 2–3 sentences: What did you build? How does it solve the problem above?
-
-[Describe your solution clearly. Explain the core mechanism — what makes it work.]
-
----
-
-## ✨ Key Features
-
-- **Feature 1:** [Brief description — e.g., "Real-time anomaly detection using watsonx.ai"]
-- **Feature 2:** [Brief description]
-- **Feature 3:** [Brief description]
-- **Feature 4:** [Optional]
-- **Feature 5:** [Optional]
-
----
-
-## 🛠️ Tech Stack
-
-| Category | Technologies |
-|---|---|
-| **Languages** | [e.g., Python, TypeScript] |
-| **Frameworks** | [e.g., FastAPI, React] |
-| **IBM Technologies** | [e.g., watsonx.ai, IBM Bob, IBM Cloud] |
-| **Databases** | [e.g., PostgreSQL, Redis] |
-| **Other** | [e.g., Docker, GitHub Actions] |
-
----
-
-## 📁 Repository Structure
-
-```
-├── src/                  # All source code
-├── docs/                 # Written documentation
-│   ├── problem-statement.md
-│   ├── solution-overview.md
-│   ├── architecture.md
-│   └── setup-guide.md
-├── demo/                 # Demo artifacts
-│   ├── screenshots/      # App screenshots
-│   └── demo-video-link.txt  # Link to demo video
-├── presentation/         # Slide deck
-└── submission.yaml       # Structured submission metadata
+```text
+React dashboard → FastAPI → deterministic intelligence services → PostgreSQL
+                       └→ optional watsonx.ai explanation layer (when configured)
 ```
 
----
+See [architecture documentation](docs/architecture.md) and the [resilience-model reference](docs/resilience-model.md) for the calculation model.
 
-## ⚡ How to Run
+## Quick start
 
-> **Copy these exact steps from your [`docs/setup-guide.md`](docs/setup-guide.md)**
+Prerequisites: Python 3.11+, Node.js 18+, and PostgreSQL 16+ (or Docker).
 
-```bash
-# 1. Clone the repo
-git clone https://github.com/[your-repo].git
-cd [your-repo]
+```powershell
+cd src
+docker compose up -d
 
-# 2. Install dependencies
-[your install command here]
-
-# 3. Configure environment
-cp .env.example .env
-# Edit .env with your values
-
-# 4. Run the project
-[your run command here]
+cd backend
+Copy-Item ..\.env.example .env
+# Update DATABASE_URL and DATABASE_SYNC_URL if your Postgres credentials differ.
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt -r requirements-dev.txt
+alembic upgrade head
+python scripts\seed.py --reset
+uvicorn app.main:app --reload --port 8000
 ```
 
----
+In another terminal:
 
-## 🖥️ Demo
+```powershell
+cd src\frontend
+npm install
+npm run dev
+```
 
-| Artifact | Link |
+The frontend runs at `http://localhost:5173`; API documentation is at `http://localhost:8000/docs`.
+
+## Environment variables
+
+Copy [`src/.env.example`](src/.env.example) to `src/backend/.env`. Required local settings are `DATABASE_URL` and `DATABASE_SYNC_URL`. `WATSONX_API_KEY`, `WATSONX_PROJECT_ID`, and `WATSONX_URL` are optional and must never be committed.
+
+## Verification
+
+```powershell
+cd src\backend
+.\.venv\Scripts\python.exe -m pytest -q
+
+cd ..\frontend
+npm run build
+```
+
+## Demo flow
+
+1. Open the dashboard to see overall RRI and disruption exposure.
+2. Open **Mumbai Port Crisis** from the demo scenario CTA.
+3. Review its summary, Disruption DNA, similar historical disruptions, affected shipment **S-1042**, and cascade.
+4. Open S-1042's wallet from decision support to inspect RRI, four resilience dimensions, contributors, and the transaction ledger.
+
+## API overview
+
+| Endpoint | Purpose |
 |---|---|
-| 📹 Demo Video | [See demo/demo-video-link.txt](demo/demo-video-link.txt) |
-| 🌐 Live Demo | [See demo/live-demo-url.txt](demo/live-demo-url.txt) |
-| 🖼️ Screenshots | [See demo/screenshots/](demo/screenshots/) |
-| 📊 Presentation | [See presentation/slides.pdf](presentation/) |
+| `GET /health` | Service health |
+| `GET /api/disruptions` | Disruption list and aggregates |
+| `GET /api/disruptions/{id}` | Detail and Disruption DNA |
+| `GET /api/disruptions/{id}/similar` | Deterministic historical similarity |
+| `GET /api/disruptions/{id}/impact` | Affected shipments and cascade |
+| `GET /api/shipments` | Operational shipment list |
+| `GET /api/shipments/{id}/resilience` | Shipment wallet and explainable RRI |
+| `GET /api/shipments/resilience/summary` | Network RRI summary |
 
----
+## Limitations
 
-## ⚠️ Known Limitations
-
-> Be honest — judges appreciate transparency over overclaiming.
-
-- [Limitation 1: e.g., "Authentication is mocked — not production-ready"]
-- [Limitation 2: e.g., "Only tested on Chrome"]
-- [Limitation 3: e.g., "Feature X is scaffolded but not fully implemented"]
-
----
-
-## 🏅 What We're Most Proud Of
-
-[Tell the judges what part of your submission is strongest and worth paying close attention to.]
-
----
+This prototype uses seeded operational data and provides decision support only; it does not execute logistics actions. watsonx.ai is not enabled unless valid credentials are supplied. Deployment URL, demo-video URL, and team metadata remain intentionally unfilled until the team provides them.

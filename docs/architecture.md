@@ -1,14 +1,12 @@
-# Architecture
+# SupplyShield Architecture
 
 ## System Architecture
-
-[Describe the overall architecture of your system. Replace the Mermaid diagram below with your actual architecture.]
 
 ```mermaid
 graph TD
     A[User / Browser] -->|HTTP| B[Frontend - React]
     B -->|REST API| C[Backend - FastAPI]
-    C -->|SDK| D[watsonx.ai]
+    C -->|optional SDK integration| D[watsonx.ai]
     C -->|Query| E[PostgreSQL]
     C -->|Publish| F[Slack Webhook]
     D -->|Inference Result| C
@@ -18,32 +16,27 @@ graph TD
 
 | Component | Technology | Responsibility |
 |---|---|---|
-| Frontend | [e.g., React 18] | [e.g., Dashboard UI, user interaction] |
-| Backend API | [e.g., FastAPI] | [e.g., Business logic, orchestration] |
-| AI / ML | [e.g., watsonx.ai] | [e.g., Anomaly scoring, classification] |
-| Database | [e.g., PostgreSQL] | [e.g., Storing pipeline events and scores] |
-| Notifications | [e.g., Slack API] | [e.g., Alerting on threshold breaches] |
+| Frontend | React 18, TypeScript, Vite, Tailwind | Dashboard and operational investigation UI |
+| Backend API | FastAPI, Pydantic, SQLAlchemy | Typed REST APIs and orchestration |
+| Deterministic intelligence | Python services | RRI, wallet, Disruption DNA, similarity, and cascade impact |
+| Optional AI | watsonx.ai | Isolated explanation layer only when configured |
+| Database | PostgreSQL 16 | Shipments, disruptions, wallet ledger, DNA, and sensor readings |
 
 ## Data Flow
 
-[Describe how data moves through your system from input to output.]
-
-1. [e.g., Pipeline logs are ingested via a webhook from GitHub Actions]
-2. [e.g., Logs are preprocessed and chunked into 512-token segments]
-3. [e.g., Each chunk is sent to the watsonx.ai inference endpoint]
-4. [e.g., Anomaly scores are stored in PostgreSQL]
-5. [e.g., The React dashboard polls the API every 30 seconds to refresh]
+1. Seeded or future operational records are stored in PostgreSQL.
+2. FastAPI queries records and invokes deterministic Python services.
+3. The services calculate wallet balances, RRI explanations, DNA features, similarity, and cascade relationships.
+4. The React client renders these values with source-aware labels and links a disruption to its affected shipment's wallet.
 
 ## Security Considerations
 
-[Note any security decisions relevant to the architecture — even if basic.]
-
-- [e.g., API keys stored in environment variables, never committed to git]
-- [e.g., All API routes require a Bearer token]
-- [e.g., Database credentials rotated via IBM Secrets Manager]
+- Credentials are environment variables and `.env` is ignored by Git.
+- CORS is restricted to configured local origins by default.
+- Deterministic calculations are separate from optional model integrations, preventing generated text from masquerading as a metric.
 
 ## Scalability Notes
 
 [Optional: how would this scale beyond the hackathon prototype?]
 
-[e.g., "The FastAPI backend is stateless and could be horizontally scaled behind a load balancer. The watsonx.ai calls are the bottleneck and would benefit from request batching."]
+The FastAPI service is stateless and can scale behind a load balancer. Database indexes exist on primary operational identifiers; production scaling would add connection pooling, authentication, observability, and asynchronous ingestion.

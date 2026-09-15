@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import {
   disruptionsApi,
   type DisruptionSummary,
@@ -20,6 +21,7 @@ import { SeverityBadge, StatusBadge, TypeBadge } from '../components/DisruptionB
 import { DNAPanel } from '../components/DNAPanel'
 import { SimilarityPanel } from '../components/SimilarityPanel'
 import { CascadeView } from '../components/CascadeView'
+import { AIInsightsPanel } from '../components/AIInsightsPanel'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -108,12 +110,19 @@ function DisruptionDetailPane({
   similar,
   impact,
   loading,
+  disruptionId,
 }: {
   detail: DisruptionDetail
   similar: SimilarityResult[]
   impact: DisruptionImpact | null
   loading: boolean
+  disruptionId: number
 }) {
+  const priorityShipment = impact?.affected_shipments.find((shipment) => shipment.shipment_code === 'S-1042')
+    ?? impact?.affected_shipments.slice().sort((a, b) => b.impact_score - a.impact_score || b.cargo_value_usd - a.cargo_value_usd)[0]
+  const rankedShipments = impact?.affected_shipments.slice().sort((a, b) =>
+    Number(b.shipment_code === 'S-1042') - Number(a.shipment_code === 'S-1042') || b.impact_score - a.impact_score || b.cargo_value_usd - a.cargo_value_usd,
+  ) ?? []
   return (
     <div className="space-y-5">
       {/* Overview */}
@@ -200,6 +209,37 @@ function DisruptionDetailPane({
       {/* Cascade View */}
       {impact && <CascadeView cascade={impact.cascade} />}
 
+      {impact && priorityShipment && (
+        <div className="rounded-xl border border-shield-700/50 bg-shield-950/20 p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-shield-400">Decision support</p>
+              <h3 className="text-sm font-semibold text-white mt-1">Investigate {priorityShipment.shipment_code} first</h3>
+              <p className="text-xs leading-relaxed text-gray-400 mt-2">
+                It has the highest observed impact in this disruption ({(priorityShipment.impact_score * 100).toFixed(0)}%),
+                with {fmtUSD(priorityShipment.cargo_value_usd)} cargo exposure and a {priorityShipment.delay_hours.toFixed(0)}h reported delay.
+              </p>
+            </div>
+            <Link to={`/resilience?shipment=${priorityShipment.shipment_id}`} className="shrink-0 text-xs font-semibold text-shield-300 hover:text-white">Open wallet →</Link>
+          </div>
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px]">
+            <div className="rounded-lg bg-gray-900/70 border border-gray-800 px-3 py-2.5">
+              <p className="font-semibold text-gray-200">Evaluate priority handling or reroute</p>
+              <p className="text-gray-500 mt-1">Review COST and CAPACITY headroom before committing; the trade-off is additional spend or constrained flexibility.</p>
+            </div>
+            <div className="rounded-lg bg-gray-900/70 border border-gray-800 px-3 py-2.5">
+              <p className="font-semibold text-gray-200">Monitor resilience depletion</p>
+              <p className="text-gray-500 mt-1">The linked wallet shows TIME, COST, TEMPERATURE, and CAPACITY remaining. This view recommends review only—it does not execute logistics actions.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Decision Support panel — deterministic facts + optional watsonx.ai narrative */}
+      <AIInsightsPanel
+        disruptionId={disruptionId}
+      />
+
       {/* Affected Shipments table */}
       {impact && impact.affected_shipments.length > 0 && (
         <div className="bg-gray-800 rounded-xl border border-gray-700 p-5">
@@ -216,9 +256,9 @@ function DisruptionDetailPane({
                 </tr>
               </thead>
               <tbody>
-                {impact.affected_shipments.map(s => (
-                  <tr key={s.shipment_id} className="border-b border-gray-700/50 hover:bg-gray-700/20">
-                    <td className="py-1.5 pr-3 font-mono text-blue-300">{s.shipment_code}</td>
+                {rankedShipments.slice(0, 12).map(s => (
+                  <tr key={s.shipment_id} className={`border-b border-gray-700/50 hover:bg-gray-700/20 ${s.shipment_code === 'S-1042' ? 'bg-shield-950/30' : ''}`}>
+                    <td className="py-1.5 pr-3 font-mono text-blue-300"><Link to={`/resilience?shipment=${s.shipment_id}`} className="hover:text-white">{s.shipment_code}</Link>{s.shipment_code === 'S-1042' && <span className="ml-1 text-[9px] text-shield-400">DEMO</span>}</td>
                     <td className="py-1.5 pr-3 text-gray-300">{s.origin} → {s.destination}</td>
                     <td className="py-1.5 pr-3 text-gray-400">{s.cargo_type}</td>
                     <td className="py-1.5 pr-3 text-gray-300">{fmtUSD(s.cargo_value_usd)}</td>
@@ -243,6 +283,7 @@ function DisruptionDetailPane({
               </tbody>
             </table>
           </div>
+          {rankedShipments.length > 12 && <p className="mt-3 text-[11px] text-gray-500">Showing the 12 highest-priority records, with S-1042 pinned for the demo. The cascade retains the full relationship count.</p>}
         </div>
       )}
     </div>
@@ -271,7 +312,10 @@ export function Disruptions() {
     const statusParam = filter === 'all' ? undefined : filter
     disruptionsApi.list(statusParam)
       .then(data => {
-        setDisruptions(data)
+        setDisruptions(data.sort((a, b) =>
+          Number(b.disruption_code === 'DIS-001') - Number(a.disruption_code === 'DIS-001') ||
+          Number(b.status === 'active') - Number(a.status === 'active') || b.severity - a.severity,
+        ))
         setListLoading(false)
         // Auto-select DIS-001 (Mumbai Port Crisis) on first load
         if (filter === 'all' && data.length > 0 && selectedId === null) {
@@ -423,6 +467,7 @@ export function Disruptions() {
               similar={similar}
               impact={impact}
               loading={similarLoading}
+              disruptionId={detail.id}
             />
           )}
         </div>

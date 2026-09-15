@@ -39,6 +39,8 @@ function NodeCard({ node, style, depth }: {
   style: { border: string; text: string; bg: string; indent: string }
   depth: number
 }) {
+  const visibleChildren = node.level === 'ROUTES' ? node.children.slice(0, 6) : node.children
+  const hiddenChildren = node.children.length - visibleChildren.length
   return (
     <div className="mb-1">
       <div className={`rounded border ${style.border} ${style.bg} px-3 py-2 mb-1`}>
@@ -54,9 +56,10 @@ function NodeCard({ node, style, depth }: {
           <p className="text-[10px] text-gray-400 mt-0.5 leading-relaxed">{node.detail}</p>
         )}
       </div>
-      {node.children.map((child, i) => (
+      {visibleChildren.map((child, i) => (
         <NodeLine key={i} node={child} depth={depth + 1} />
       ))}
+      {hiddenChildren > 0 && <p className="ml-6 py-1 text-[10px] text-gray-500">+ {hiddenChildren} additional affected shipments — see the ranked investigation table below.</p>}
     </div>
   )
 }
@@ -71,7 +74,7 @@ export function CascadeView({ cascade }: Props) {
       <div className="mb-4">
         <h3 className="text-sm font-semibold text-white">Cascading Impact</h3>
         <p className="text-[11px] text-gray-500 mt-0.5">
-          Real database relationships — no fabricated connections
+          Deterministic propagation from recorded database relationships
         </p>
       </div>
 

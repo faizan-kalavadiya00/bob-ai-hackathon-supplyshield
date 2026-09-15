@@ -10,3 +10,5 @@ httpx
 # Provides both postgresql+psycopg:// (sync, for Alembic/seed)
 # and postgresql+psycopg_async:// (async, for FastAPI)
 psycopg[binary]
+
+ibm-watsonx-ai

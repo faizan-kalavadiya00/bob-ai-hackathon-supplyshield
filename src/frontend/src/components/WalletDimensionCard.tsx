@@ -20,10 +20,10 @@ const DIM_ICONS: Record<string, string> = {
 }
 
 const DIM_LABELS: Record<string, string> = {
-  time:        'Time Buffer',
-  cost:        'Cost Buffer',
-  temperature: 'Temp Tolerance',
-  capacity:    'Spare Capacity',
+  time:        'TIME',
+  cost:        'COST',
+  temperature: 'TEMPERATURE',
+  capacity:    'CAPACITY',
 }
 
 function fmt(value: number, unit: string): string {
@@ -69,17 +69,16 @@ export function WalletDimensionCard({ dim, showDetails = true }: WalletDimension
         />
       </div>
 
-      {/* Score and values */}
       <div className="flex items-end justify-between">
         <div>
-          <p className="text-2xl font-bold text-gray-100">{dim.dimension_score.toFixed(0)}</p>
-          <p className="text-[10px] text-gray-500 uppercase tracking-wide">Score / 100</p>
+          <p className="text-2xl font-bold text-gray-100">{remainPct.toFixed(0)}%</p>
+          <p className="text-[10px] text-gray-500 uppercase tracking-wide">remaining</p>
         </div>
         {showDetails && (
           <div className="text-right text-xs text-gray-500 space-y-0.5">
-            <p className="text-gray-300">{fmt(dim.remaining_balance, dim.unit)}</p>
-            <p>of {fmt(dim.maximum_balance, dim.unit)}</p>
-            <p>{utilPct.toFixed(1)}% consumed</p>
+            <p><span className="text-gray-600">Available </span><span className="text-gray-300">{fmt(dim.maximum_balance, dim.unit)}</span></p>
+            <p><span className="text-gray-600">Consumed </span><span className="text-amber-300">{fmt(dim.consumed_balance, dim.unit)}</span></p>
+            <p><span className="text-gray-600">Remaining </span><span className="text-gray-100">{fmt(dim.remaining_balance, dim.unit)}</span></p>
           </div>
         )}
       </div>

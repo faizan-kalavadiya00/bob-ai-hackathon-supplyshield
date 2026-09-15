@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useBackendStatus } from '../hooks/useBackendStatus'
 import { resilienceApi, type RRISummary } from '../api/resilience'
+import { disruptionsApi, type DisruptionSummary } from '../api/disruptions'
 import { RRIGauge } from '../components/RRIGauge'
 
 function useRRISummary() {
@@ -114,13 +116,28 @@ function StatusCountsRow({ summary }: { summary: RRISummary }) {
 
 export function Dashboard() {
   const { summary, loading, error, refresh } = useRRISummary()
+  const [disruptions, setDisruptions] = useState<DisruptionSummary[]>([])
+  const [disruptionError, setDisruptionError] = useState<string | null>(null)
+
+  useEffect(() => {
+    disruptionsApi.list()
+      .then(setDisruptions)
+      .catch((e) => setDisruptionError(String(e)))
+  }, [])
+
+  const active = disruptions.filter((disruption) => disruption.status === 'active' || disruption.status === 'monitoring')
+  const totalExposure = active.reduce((sum, disruption) => sum + disruption.total_cargo_exposure_usd, 0)
+  const critical = active.filter((disruption) => disruption.severity >= 7)
+  const demo = disruptions.find((disruption) => disruption.disruption_code === 'DIS-001')
 
   return (
     <div className="p-6 space-y-6">
-      {/* Phase banner */}
-      <div className="rounded-lg border border-shield-700/50 bg-shield-950/30 px-4 py-3 text-sm text-shield-300">
-        <strong className="font-semibold">Phase 3 — Resilience Wallet + RRI.</strong>
-        {' '}Network RRI is calculated deterministically from {summary?.total_shipments_assessed ?? '…'} active shipments.
+      <div className="rounded-xl border border-shield-700/50 bg-shield-950/30 px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <p className="text-xs uppercase tracking-widest text-shield-400 font-semibold">Live resilience posture</p>
+          <p className="text-sm text-shield-100 mt-1">Deterministic RRI, wallet balances, disruption DNA, and cascade impact are calculated from the operational database.</p>
+        </div>
+        <Link to="/disruptions" className="shrink-0 rounded-lg bg-shield-600 hover:bg-shield-500 px-3 py-2 text-xs font-semibold text-white">Open Mumbai scenario →</Link>
       </div>
 
       {/* System + RRI summary */}
@@ -152,53 +169,45 @@ export function Dashboard() {
         </section>
       )}
 
+      <section>
+        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3">Disruption exposure</h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[
+            ['Active disruptions', String(active.length), 'currently active or being monitored'],
+            ['Critical disruptions', String(critical.length), 'severity 7 or above'],
+            ['Financial exposure', totalExposure >= 1_000_000 ? `$${(totalExposure / 1_000_000).toFixed(1)}M` : `$${Math.round(totalExposure / 1000)}K`, 'linked cargo value at risk'],
+            ['Affected shipments', String(active.reduce((sum, disruption) => sum + disruption.affected_shipment_count, 0)), 'across live disruptions'],
+          ].map(([label, value, hint]) => (
+            <div key={label} className="rounded-xl border border-gray-800 bg-gray-900 p-4">
+              <p className="text-[10px] uppercase tracking-widest text-gray-500">{label}</p>
+              <p className="text-2xl font-bold text-white mt-2">{value}</p>
+              <p className="text-[11px] text-gray-600 mt-1">{hint}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {demo && (
+        <section className="rounded-xl border border-amber-800/50 bg-amber-950/20 p-5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-amber-400">Demo scenario</p>
+              <h2 className="text-lg font-bold text-white mt-1">{demo.name} <span className="font-mono text-sm text-gray-400">{demo.disruption_code}</span></h2>
+              <p className="text-sm text-gray-400 mt-1">{demo.affected_region} · {demo.affected_shipment_count} affected shipments · ${demo.total_cargo_exposure_usd.toLocaleString()} exposure</p>
+            </div>
+            <Link to="/disruptions" className="text-sm font-semibold text-amber-300 hover:text-amber-100">Investigate disruption →</Link>
+          </div>
+        </section>
+      )}
+
       {/* Error */}
       {error && (
         <div className="rounded-lg border border-red-800 bg-red-950/30 px-4 py-3 text-xs text-red-400">
           {error}
         </div>
       )}
+      {disruptionError && <div className="rounded-lg border border-red-800 bg-red-950/30 px-4 py-3 text-xs text-red-400">{disruptionError}</div>}
 
-      {/* Capability map */}
-      <section>
-        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3">
-          Capability Areas
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {[
-            { icon: '🛡', label: 'Resilience Wallet',     phase: 3, done: true  },
-            { icon: '📊', label: 'RRI Engine',            phase: 3, done: true  },
-            { icon: '🚢', label: 'Shipment Tracking',     phase: 4, done: false },
-            { icon: '⚡', label: 'Disruption Management', phase: 4, done: false },
-            { icon: '🚛', label: 'Fleet Optimization',    phase: 4, done: false },
-            { icon: '❄',  label: 'Cold-Chain Monitor',   phase: 4, done: false },
-            { icon: '🔬', label: 'Disruption Simulation', phase: 4, done: false },
-            { icon: '♻',  label: 'Recovery Planning',    phase: 4, done: false },
-            { icon: '🤖', label: 'IBM Bob / MCP Agent',  phase: 5, done: false },
-          ].map((area) => (
-            <div
-              key={area.label}
-              className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-sm ${
-                area.done
-                  ? 'bg-shield-900/30 border-shield-700/50 text-shield-300'
-                  : 'bg-gray-900 border-gray-800 text-gray-400'
-              }`}
-            >
-              <span className="text-lg" aria-hidden="true">{area.icon}</span>
-              <span className="flex-1">{area.label}</span>
-              {area.done ? (
-                <span className="text-[10px] text-shield-400 bg-shield-900/50 rounded px-1.5 py-0.5">
-                  Live
-                </span>
-              ) : (
-                <span className="text-[10px] text-gray-600 bg-gray-800 rounded px-1.5 py-0.5">
-                  Phase {area.phase}
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
     </div>
   )
 }

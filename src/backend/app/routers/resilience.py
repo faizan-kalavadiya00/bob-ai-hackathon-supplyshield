@@ -134,6 +134,60 @@ def _save_snapshot(sync_session: Session, ship_id: int, exp: RRIExplanation) -> 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.get(
+    "/resilience/summary",
+    response_model=RRISummarySchema,
+    tags=["Dashboard"],
+    summary="Aggregate RRI summary across all active shipments",
+)
+async def get_resilience_summary(
+    db: AsyncSession = Depends(get_db),
+) -> RRISummarySchema:
+    """Compute the real, deterministic resilience posture for active shipments."""
+    def _work(sync_session: Session):
+        shipments = (
+            sync_session.query(Shipment)
+            .filter(Shipment.status.in_([
+                ShipmentStatus.IN_TRANSIT,
+                ShipmentStatus.AT_RISK,
+                ShipmentStatus.DELAYED,
+                ShipmentStatus.PLANNED,
+            ]))
+            .all()
+        )
+        if not shipments:
+            return None
+
+        counts = {"HEALTHY": 0, "STRESSED": 0, "VULNERABLE": 0, "CRITICAL": 0, "BANKRUPT": 0}
+        rri_total = 0.0
+        bankruptcies = 0
+        for ship in shipments:
+            if ship.route_id:
+                ship.route = sync_session.get(Route, ship.route_id)
+            ws = get_wallet_state(sync_session, ship, cfg)
+            exp = calculate_rri(ws, ship.priority, cfg)
+            counts[exp.status.value] = counts.get(exp.status.value, 0) + 1
+            rri_total += exp.rri
+            bankruptcies += int(exp.is_resilience_bankrupt)
+        return len(shipments), counts, rri_total, bankruptcies
+
+    result = await db.run_sync(_work)
+    if result is None:
+        return RRISummarySchema(
+            total_shipments_assessed=0, average_rri=0.0,
+            healthy_count=0, stressed_count=0, vulnerable_count=0,
+            critical_count=0, bankrupt_count=0, resilience_bankruptcies=0,
+            computed_at=datetime.now(timezone.utc),
+        )
+    n, counts, rri_total, bankruptcies = result
+    return RRISummarySchema(
+        total_shipments_assessed=n, average_rri=round(rri_total / n, 2),
+        healthy_count=counts.get("HEALTHY", 0), stressed_count=counts.get("STRESSED", 0),
+        vulnerable_count=counts.get("VULNERABLE", 0), critical_count=counts.get("CRITICAL", 0),
+        bankrupt_count=counts.get("BANKRUPT", 0), resilience_bankruptcies=bankruptcies,
+        computed_at=datetime.now(timezone.utc),
+    )
+
+@router.get(
     "/{shipment_id}/resilience",
     response_model=ResilienceResponse,
     summary="Get resilience wallet and RRI for a shipment",
@@ -257,72 +311,3 @@ async def list_resilience_transactions(
 
     txs = await db.run_sync(_load_txs)
     return [TransactionSchema.model_validate(tx) for tx in txs]
-
-
-@router.get(
-    "/resilience/summary",
-    response_model=RRISummarySchema,
-    tags=["Dashboard"],
-    summary="Aggregate RRI summary across all active shipments",
-)
-async def get_resilience_summary(
-    db: AsyncSession = Depends(get_db),
-) -> RRISummarySchema:
-    """
-    Compute aggregate RRI statistics from the current database state.
-    All numbers are calculated — none are hardcoded.
-    """
-    def _work(sync_session: Session):
-        shipments = (
-            sync_session.query(Shipment)
-            .filter(Shipment.status.in_([
-                ShipmentStatus.IN_TRANSIT,
-                ShipmentStatus.AT_RISK,
-                ShipmentStatus.DELAYED,
-                ShipmentStatus.PLANNED,
-            ]))
-            .all()
-        )
-        if not shipments:
-            return None
-
-        counts = {"HEALTHY": 0, "STRESSED": 0, "VULNERABLE": 0, "CRITICAL": 0, "BANKRUPT": 0}
-        rri_total = 0.0
-        bankruptcies = 0
-
-        for ship in shipments:
-            if ship.route_id:
-                ship.route = sync_session.get(Route, ship.route_id)
-            ws = get_wallet_state(sync_session, ship, cfg)
-            exp = calculate_rri(ws, ship.priority, cfg)
-            status_key = exp.status.value
-            counts[status_key] = counts.get(status_key, 0) + 1
-            rri_total += exp.rri
-            if exp.is_resilience_bankrupt:
-                bankruptcies += 1
-
-        return len(shipments), counts, rri_total, bankruptcies
-
-    result = await db.run_sync(_work)
-    if result is None:
-        return RRISummarySchema(
-            total_shipments_assessed=0,
-            average_rri=0.0,
-            healthy_count=0, stressed_count=0, vulnerable_count=0,
-            critical_count=0, bankrupt_count=0,
-            resilience_bankruptcies=0,
-            computed_at=datetime.now(timezone.utc),
-        )
-
-    n, counts, rri_total, bankruptcies = result
-    return RRISummarySchema(
-        total_shipments_assessed=n,
-        average_rri=round(rri_total / n, 2),
-        healthy_count=counts.get("HEALTHY", 0),
-        stressed_count=counts.get("STRESSED", 0),
-        vulnerable_count=counts.get("VULNERABLE", 0),
-        critical_count=counts.get("CRITICAL", 0),
-        bankrupt_count=counts.get("BANKRUPT", 0),
-        resilience_bankruptcies=bankruptcies,
-        computed_at=datetime.now(timezone.utc),
-    )
